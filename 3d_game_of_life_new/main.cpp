@@ -10,7 +10,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 
 static const int WINDOWHEIGHT = 1200;
 static const int WINDOWWIDTH = 2400;
-gridManager* gameGrid;
+generalLifeLike* gameGrid;
 static bool hidden = false;
 
 static Camera *programCamera = new Camera(glm::vec3(0.0f, 0.0f, -3.0f), glm::vec3(10.0f, 10.0f, 10.0f),
@@ -134,23 +134,45 @@ int main()
 	//startBlock.push_back(glm::vec3(11.0f, 12.0f, 11.0f));
 	//startBlock.push_back(glm::vec3(12.0f, 11.0f, 11.0f));
 	//startBlock.push_back(glm::vec3(12.0f, 12.0f, 11.0f));
-	startBlock.push_back(glm::vec3(int(gridSz / 2), int(gridSz / 2), int(gridSz / 2) + 1));
-	startBlock.push_back(glm::vec3(int(gridSz / 2), int(gridSz / 2) + 1, int(gridSz / 2) + 1));
-	startBlock.push_back(glm::vec3(int(gridSz / 2) + 1, int(gridSz / 2), int(gridSz / 2) + 1));
-	startBlock.push_back(glm::vec3(int(gridSz / 2) + 1, int(gridSz / 2) + 1, int(gridSz / 2) + 1));
+	//startBlock.push_back(glm::vec3(int(gridSz / 2), int(gridSz / 2), int(gridSz / 2) + 1));
+	//startBlock.push_back(glm::vec3(int(gridSz / 2), int(gridSz / 2) + 1, int(gridSz / 2) + 1));
+	//startBlock.push_back(glm::vec3(int(gridSz / 2) + 1, int(gridSz / 2), int(gridSz / 2) + 1));
+	//startBlock.push_back(glm::vec3(int(gridSz / 2) + 1, int(gridSz / 2) + 1, int(gridSz / 2) + 1));
 	int randnum;
 	for (int x = 0; x < 20; x++) {
 		for (int y = 0; y < 20; y++) {
 			for (int z = 0; z < 20; z++) {
-				if (x % 2 == 0 && y % 2 == 0 && z % 2 == 0) {
-					startBlock.push_back(glm::vec3(x + 10, y + 10, z + 10));
-				}
-				
+					startBlock.push_back(glm::vec3(x + 5, y + 5, z + 5));
 			}
 		}
 	}
 	//startBlock.push_back(glm::vec3(3.0f, 3.0f, 3.0f));
-	gameGrid = new gameOfLife2d(gridSz, startBlock, 2, 3, 3, 3);
+	std::vector<glm::vec3> initNeigh;
+	
+	for (int x = -1; x < 2; x++) {
+		for (int y = -1; y < 2; y++) {
+			for (int z = -1; z < 2; z++) {
+				if (!(x == 0 && y == 0 && z == 0)) {
+					initNeigh.push_back(glm::vec3(x, y, z));
+				}
+
+			}
+		}
+	}
+	/*
+	initNeigh.push_back(glm::vec3(0, 0, 1));
+	initNeigh.push_back(glm::vec3(0, 1, 0));
+	initNeigh.push_back(glm::vec3(1, 0, 0));
+	initNeigh.push_back(glm::vec3(0, 0, -1));
+	initNeigh.push_back(glm::vec3(0, -1, 0));
+	initNeigh.push_back(glm::vec3(-1, 0, 0));
+	*/
+
+	std::vector<int> survives{ 1,4,8,11,13,14,15,16,17,18,19,20,21,22,23,24,25,26};
+	std::vector<int> born{13,14,15,16,17,18,19,20,21,22,23,24,25,26};
+
+	gameGrid = new generalLifeLike(gridSz, startBlock, initNeigh, 2, survives, born, false);
+	
 
 	//gameGrid.initializeGrid(8, startBlock);
 
@@ -168,6 +190,7 @@ int main()
 
 	std::thread updater(updateCurGrid);
 	float mousex, mousey, mousez;
+
 	//Render loop
 	while (!glfwWindowShouldClose(window))
 	{
@@ -192,61 +215,6 @@ int main()
 		glBindVertexArray(VAO);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		gameGrid->render(VAO, shaderProgram);
-
-		//gridPtr = gameGrid->tempgrid;
-
-		//
-		//int y, x = 0;
-		//int neighbours;
-		//gameGrid->m.lock();
-		//for (int z = 0; z < gameGrid->gridSize; z++) 
-		//{
-		//	y = 0;
-		//	do {
-		//		x = 0;
-		//		do {
-		//			
-		//			while (*gridPtr == 0) {
-		//				gridPtr++;
-		//				if (++x >= gameGrid->gridSize) goto rowDone;
-		//			}
-
-		//			if (*gridPtr & 0x01) {
-		//				neighbours = *gridPtr >> 1;
-
-		//				glm::mat4 model = glm::mat4(1.0f);
-		//				//translate the box to the right position. adding .5 since the boxes are centered at the passed in vector
-		//				model = glm::translate(model, glm::vec3(x + 0.5, y + 0.5, z + 0.5));
-		//				//assign the model uniform
-		//				shaderProgram.setMat4("model", model);
-
-		//				glm::vec3 boxColor;
-		//				if (neighbours >= gameGrid->liveUpper && neighbours <= gameGrid->liveUpper)
-		//					boxColor = glm::vec3(0.05f, 0.7f, 0.6f);
-		//				else if (neighbours >= gameGrid->replicateLower && neighbours <= gameGrid->replicateUpper)
-		//					boxColor = glm::vec3(0.3f, 0.2f, 0.9f);
-		//				else 
-		//					boxColor = glm::vec3(((neighbours - gameGrid->liveUpper) * (neighbours - gameGrid->liveUpper)) % 10 * 0.04,
-		//					((neighbours - gameGrid->liveUpper) * (neighbours - gameGrid->liveUpper)) % 10 * 0.065, 
-		//						((neighbours - gameGrid->liveUpper) * (neighbours - gameGrid->liveUpper)) % 10 * 0.1);
-
-
-		//				shaderProgram.setVec3("inColor", boxColor);
-		//				//draw the box
-		//				glBindVertexArray(VAO);
-		//				glDrawArrays(GL_TRIANGLES, 0, 36);
-		//			}
-		//			gridPtr++;
-		//			x++;
-
-		//		} while (x < gameGrid->gridSize);
-		//	rowDone:;
-		//		y++;
-		//	} while (y < gameGrid->gridSize);
-		//}
-		////std::cout << sizeof(unsigned int) << " " << sizeof(unsigned char) << " \n";
-		//gameGrid->m.unlock();
-		////Sleep(10);
 
 		//Drawing the box outline
 		glm::vec3 boxColor = glm::vec3(0.9f, 0.9f, 1.0f);
