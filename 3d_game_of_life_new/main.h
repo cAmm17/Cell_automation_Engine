@@ -14,4 +14,3 @@
 class gridManager;
 class Shader;
 class Camera;
-class Player;

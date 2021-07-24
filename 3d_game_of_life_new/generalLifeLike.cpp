@@ -30,365 +30,167 @@ generalLifeLike::generalLifeLike(int gridsz, std::vector<glm::vec3> initialBoxes
 	survives = s;
 	born = b;
 	numOfNeighbours = 0;
+	is2d = set2d;
+	update = true;
+	paused = true;
+	gridSetup = false;
 
-	decayStateNum = decayStates;
-	bitShiftNum = 1;
-	testTwo = 1;
-	while (decayStateNum > testTwo) {
-		bitShiftNum++;
-		testTwo *= 2;
-	}
-	compareNum = testTwo * 2 - 1;
+	setDecayStates(decayStates, initialNeighbours);
 
-	std::cout << "comp : " << compareNum << " bit: " << bitShiftNum << "\n";
-	////world's most efficent algorithm
-	//int num = states[0];
-	//if (num == 0) {
-	//	state0Prev = states[states.size() - 1];
-	//}
-	//else if (num == 1) {
-	//	state1Prev = states[states.size() - 1];
-	//}
-	//else if (num == 2) {
-	//	state2Prev = states[states.size() - 1];
-	//}
-	//else {
-	//	state3Prev = states[states.size() - 1];
-	//}
-	//for (int num = 1; num < states.size(); num++) {
-	//	if (num == 0) {
-	//		state0Prev = states[states.size() - 1];
-	//	}
-	//	else if (num == 1) {
-	//		state1Prev = states[states.size() - 1];
-	//	}
-	//	else if (num == 2) {
-	//		state2Prev = states[states.size() - 1];
-	//	}
-	//	else {
-	//		state3Prev = states[states.size() - 1];
-	//	}
-	//}
-
-	int possible_neighbours = 255 - std::pow(2, bitShiftNum);
-	if (possible_neighbours < 1) {
-		std::cout << "ERROR :: TOO MANY DECAY STATES \n";
-	}
-
-
-	if (set2d) {
-		is2d = true;
-		grid = new unsigned char[gridsz * gridsz];
-		tempgrid = new unsigned char[gridsz * gridsz];
-
-
-
-		//Creating the array storing the user specified neighbours to check
-		if (initialNeighbours.size() < possible_neighbours) {
-			neighbourOffsets = new unsigned int[initialNeighbours.size() * 2];
-		}
-		else {
-			neighbourOffsets = new unsigned int[possible_neighbours * 2];
-		}
-
-		int curIndex = 0;
-
-		for (glm::vec3 neighbour : initialNeighbours) {
-			//if (curIndex >= possible_neighbours) break;
-
-			numOfNeighbours++;
-			neighbourOffsets[curIndex] = neighbour.x;
-			neighbourOffsets[curIndex + 1] = neighbour.y;
-			curIndex += 2;
-		}
-
-
-
-		gridSize = gridsz;
-		memset(grid, 0, gridsz * gridsz);
-		gridCenter = int(gridSize / 2);
-
-		for (glm::vec3 &box : initialBoxes) {
-			editBox(int(box.x), int(box.y), 0, 1);
-		}
-
-		memcpy(tempgrid, grid, gridSize * gridSize);
+	if (is2d) {
+		//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
+		fullGridSize = gridsz * gridsz;
 	}
 	else {
-		is2d = false;
-		grid = new unsigned char[gridsz * gridsz * gridsz];
-		tempgrid = new unsigned char[gridsz * gridsz * gridsz];
-
-
-
-		//Creating the array storing the user specified neighbours to check
-		if (initialNeighbours.size() < possible_neighbours) {
-			neighbourOffsets = new unsigned int[initialNeighbours.size() * 3];
-		}
-		else {
-			neighbourOffsets = new unsigned int[possible_neighbours * 3];
-		}
-		
-		int curIndex = 0;
-		
-		for (glm::vec3 neighbour : initialNeighbours) {
-			//if (curIndex >= possible_neighbours) break;
-
-			numOfNeighbours++;
-			neighbourOffsets[curIndex] = neighbour.x;
-			neighbourOffsets[curIndex + 1] = neighbour.y;
-			neighbourOffsets[curIndex + 2] = neighbour.z;
-			curIndex += 3;
-		}
-
-
-
-		gridSize = gridsz;
-		memset(grid, 0, gridsz * gridsz * gridsz);
-		gridCenter = int(gridSize / 2);
-
-		for (glm::vec3 &box : initialBoxes) {
-			editBox(int(box.x), int(box.y), int(box.z), 1);
-			std::cout << "added box: " << box.x << " " << box.y << " " << box.z << " \n";
-		}
-
-		memcpy(tempgrid, grid, gridSize * gridSize * gridSize);
+		fullGridSize = gridsz * gridsz * gridsz;
 	}
 
+	//creating the char arrays for the grids themselves
+	grid = new unsigned char[fullGridSize];
+	swapGrid = new unsigned char[fullGridSize];
 
-	update = true;
-	notPaused = false;
+	std::cout << initialNeighbours.size() << "\n";
+
+	//create the vector to put the neighbours that will be checked for each cell in. Due to the way cells are stored, the program checks if there are too many neighbours in the initial neighbours vector and restricts the number
+	
+	
+	//adds the user inputed neighbours to the neighbour offset list
+
+	setNeighbours(initialNeighbours);
+
+	gridSize = gridsz;
+	memset(grid, 0, fullGridSize);
+	gridCenter = int(gridSize / 2);
+
+	for (glm::vec3 &box : initialBoxes) {
+		if (!is2d) addNewCell(int(box.x), int(box.y), int(box.z), false);
+		else addNewCell(int(box.x), int(box.y), 0, false);
+	}
+
+	//copys data from the temp grid to the new grid
+	memcpy(swapGrid, grid, fullGridSize);
+
+	gridSetup = true;
+	
 }
-//
-//game_of_life_3d::~game_of_life_3dr() {
-//	delete[] grid;
-//	delete[] tempgrid;
-//}
+
 
 int generalLifeLike::getState(int xin, int yin, int zin) const {
-	unsigned char *gridBoxPtr = grid + xin + yin * gridSize + zin * gridSize * gridSize;
+	unsigned char *gridBoxPtr;
+	if(is2d) gridBoxPtr = grid + xin + yin * gridSize;
+	else gridBoxPtr = grid + xin + yin * gridSize + zin * gridSize * gridSize;
 
-	return *gridBoxPtr & 0x01;
+	return *gridBoxPtr & compareNum;
 }
 
-
-void generalLifeLike::editBox(int xin, int yin, int zin, int editType, bool playerEdit) const {
+void generalLifeLike::addNewCell(int xin, int yin, int zin, bool playerEdit) {
 	unsigned char* gridToEdit;
 	if (playerEdit) {
-		gridToEdit = tempgrid;
+		gridToEdit = swapGrid;
 	}
 	else {
 		gridToEdit = grid;
 	}
 
-	//std::cout << xin << " " << yin << " " << zin << "\n";
-	if (xin < gridSize && yin < gridSize && zin < gridSize && !is2d) {
-		unsigned char *gridBoxPtr = gridToEdit + xin + yin * gridSize + zin * gridSize * gridSize;
+	unsigned char *gridBoxPtr = gridToEdit + xin + yin * gridSize + zin * gridSize * gridSize;
 
-		
-		if (editType == 1 && (*gridBoxPtr & compareNum) == 0) {
-			
-			*(gridBoxPtr) |= decayStateNum;
+	if (is2d) zin = 0;
 
-			if (xin == 24 && yin == 24) {
-				xin = 24;
+	if (xin < gridSize && yin < gridSize && zin < gridSize && (*gridBoxPtr & compareNum) == 0) {
+
+		*(gridBoxPtr) |= decayStateNum;
+
+		int x, y, z;
+
+		// unsigned int neighb = *gridBoxPtr >> bitShiftNum;
+
+		for (int ni = 0; ni < numOfNeighbours * 3; ni += 3) {
+			x = neighbourOffsets[ni];
+			y = neighbourOffsets[ni + 1];
+			z = neighbourOffsets[ni + 2];
+
+			if (xin + x >= 0 && xin + x < gridSize &&
+				yin + y >= 0 && yin + y < gridSize &&
+				zin + z >= 0 && zin + z < gridSize &&
+				!(x == 0 && y == 0 && z == 0)) {
+				gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
+				*(gridBoxPtr) += neighbourBitShiftNum * 2;
 			}
+		}
+	}
+}
 
-			int x, y, z;
+void generalLifeLike::decayCell(int xin, int yin, int zin, bool playerEdit) {
+	unsigned char* gridToEdit;
+	if (playerEdit) {
+		gridToEdit = swapGrid;
+	}
+	else {
+		gridToEdit = grid;
+	}
 
-			// unsigned int neighb = *gridBoxPtr >> bitShiftNum;
+	unsigned char *gridBoxPtr = gridToEdit + xin + yin * gridSize + zin * gridSize * gridSize;
 
+	if (is2d) zin = 0;
+
+	if (xin < gridSize && yin < gridSize && zin < gridSize && (*gridBoxPtr & compareNum) > 0) {
+		*(gridBoxPtr) -= 1;
+
+			if ((*gridBoxPtr & compareNum) + 1 == decayStateNum) {
+				int x, y, z;
+					for (int ni = 0; ni < numOfNeighbours * 3; ni += 3) {
+						x = neighbourOffsets[ni];
+						y = neighbourOffsets[ni + 1];
+						z = neighbourOffsets[ni + 2];
+
+						if (xin + x >= 0 && xin + x < gridSize &&
+							yin + y >= 0 && yin + y < gridSize &&
+							zin + z >= 0 && zin + z < gridSize &&
+							!(x == 0 && y == 0 && z == 0)) {
+							gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
+							*(gridBoxPtr) -= neighbourBitShiftNum * 2;
+						}
+					}
+
+			}
+	}
+}
+
+void generalLifeLike::removeCell(int xin, int yin, int zin, bool playerEdit) {
+	unsigned char* gridToEdit;
+	if (playerEdit) {
+		gridToEdit = swapGrid;
+	}
+	else {
+		gridToEdit = grid;
+	}
+
+	unsigned char *gridBoxPtr = gridToEdit + xin + yin * gridSize + zin * gridSize * gridSize;
+
+	if (is2d) zin = 0;
+
+	if (xin < gridSize && yin < gridSize && zin < gridSize && (*gridBoxPtr & compareNum) != 0) {
+		int x, y, z;
+
+		if ( decayStateNum == 1 || (playerEdit && (*gridBoxPtr & compareNum) == decayStateNum)) {
 			for (int ni = 0; ni < numOfNeighbours * 3; ni += 3) {
 				x = neighbourOffsets[ni];
 				y = neighbourOffsets[ni + 1];
 				z = neighbourOffsets[ni + 2];
-				
 				if (xin + x >= 0 && xin + x < gridSize &&
 					yin + y >= 0 && yin + y < gridSize &&
 					zin + z >= 0 && zin + z < gridSize &&
 					!(x == 0 && y == 0 && z == 0)) {
 					gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
-					*(gridBoxPtr) += testTwo * 2;
-				}
-			}
-		}
-		else if (editType == 0 && (*gridBoxPtr & compareNum) != 0) {
-
-			*(gridBoxPtr) &= ~compareNum;
-			int x, y, z;
-
-			if (playerEdit || decayStateNum == 1) {
-				for (int ni = 0; ni < numOfNeighbours * 3; ni += 3) {
-					x = neighbourOffsets[ni];
-					y = neighbourOffsets[ni + 1];
-					z = neighbourOffsets[ni + 2];
-					if (xin + x >= 0 && xin + x < gridSize &&
-						yin + y >= 0 && yin + y < gridSize &&
-						zin + z >= 0 && zin + z < gridSize &&
-						!(x == 0 && y == 0 && z == 0)) {
-						gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
-						*(gridBoxPtr) -= testTwo * 2;
-					}
-				}
-			}
-			
-
-		}
-		else if (!playerEdit && editType == 2 && (*gridBoxPtr & compareNum) > 0) {
-			*(gridBoxPtr) -= 1;
-
-			if ((*gridBoxPtr & compareNum) + 1 == decayStateNum) {
-				int x, y, z;
-				for (int ni = 0; ni < numOfNeighbours * 3; ni += 3) {
-					x = neighbourOffsets[ni];
-					y = neighbourOffsets[ni + 1];
-					z = neighbourOffsets[ni + 2];
-					
-					if (xin + x >= 0 && xin + x < gridSize &&
-						yin + y >= 0 && yin + y < gridSize &&
-						zin + z >= 0 && zin + z < gridSize &&
-						!(x == 0 && y == 0 && z == 0)) {
-						gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
-						*(gridBoxPtr) -= testTwo * 2;
-					}
-				}
-
-			}
-
-		}
-		if (playerEdit) memcpy(grid, tempgrid, gridSize * gridSize * gridSize);
-	}
-		
-	else if (xin < gridSize && yin < gridSize && zin < gridSize) {
-		unsigned char *gridBoxPtr = gridToEdit + xin + yin * gridSize;
-
-		if (editType == 1 && (*gridBoxPtr & testTwo) == 0) {
-			*(gridBoxPtr) |= decayStateNum;
-
-			int x, y;
-
-			for (int ni = 0; ni < numOfNeighbours * 2; ni += 2) {
-				x = neighbourOffsets[ni];
-				y = neighbourOffsets[ni + 1];
-				if (xin + x >= 0 && xin + x < gridSize &&
-					yin + y >= 0 && yin + y < gridSize &&
-					!(x == 0 && y == 0)) {
-					gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize;
-					*(gridBoxPtr) += bitShiftNum * 2;
-				}
-			}
-		}
-		else if (editType == 0 && (*gridBoxPtr & testTwo) == 1) {
-			*(gridBoxPtr) &= ~0x01;
-		}
-		else if (editType == 2) {
-
-			if ((*gridBoxPtr & compareNum) == compareNum - 1) {
-				int x, y;
-
-				for (int ni = 0; ni < numOfNeighbours * 2; ni += 2) {
-					x = neighbourOffsets[ni];
-					y = neighbourOffsets[ni + 1];
-					if (xin + x >= 0 && xin + x < gridSize &&
-						yin + y >= 0 && yin + y < gridSize &&
-						!(x == 0 && y == 0)) {
-						gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize;
-						*(gridBoxPtr) -= bitShiftNum * 2;
-					}
+					*(gridBoxPtr) -= neighbourBitShiftNum * 2;
 				}
 			}
 
-			*(gridBoxPtr) -= 0x01;
 		}
-		if (playerEdit) memcpy(grid, tempgrid, gridSize * gridSize);
-
+		gridBoxPtr = gridToEdit + xin + yin * gridSize + zin * gridSize * gridSize;
+		*(gridBoxPtr) &= ~compareNum;
 	}
 }
-
-
-
-void generalLifeLike::editState0(int xin, int yin, int zin, unsigned char *gridBoxPtr, unsigned char* gridToEdit) {
-	*(gridBoxPtr) &= ~0x01;
-	if (bitShiftNum > 1) *(gridBoxPtr) &= ~0x02;
-	int x, y, z;
-
-	for (int ni = 0; ni < numOfNeighbours; ni += 3) {
-		x = neighbourOffsets[ni];
-		y = neighbourOffsets[ni + 1];
-		z = neighbourOffsets[ni + 2];
-		if (xin + x >= 0 && xin + x < gridSize &&
-			yin + y >= 0 && yin + y < gridSize &&
-			zin + z >= 0 && zin + z < gridSize &&
-			!(x == 0 && y == 0 && z == 0)) {
-			gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
-			*(gridBoxPtr) -= 2 * bitShiftNum;
-		}
-	}
-	
-}
-
-void generalLifeLike::editState1(int xin, int yin, int zin, unsigned char *gridBoxPtr, unsigned char* gridToEdit) {
-	*(gridBoxPtr) |= 0x01;
-	if (bitShiftNum > 1)*(gridBoxPtr) &= ~0x02;
-	
-	int x, y, z;
-
-	for (int ni = 0; ni < numOfNeighbours; ni += 3) {
-		x = neighbourOffsets[ni];
-		y = neighbourOffsets[ni];
-		z = neighbourOffsets[ni];
-		if (xin + x >= 0 && xin + x < gridSize &&
-			yin + y >= 0 && yin + y < gridSize &&
-			zin + z >= 0 && zin + z < gridSize &&
-			!(x == 0 && y == 0 && z == 0)) {
-			gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
-			*(gridBoxPtr) += 2 * bitShiftNum;
-		}
-	}
-
-
-}
-/*
-void generalLifeLike::editState2(int xin, int yin, int zin, unsigned char *gridBoxPtr, unsigned char* gridToEdit) {
-	*(gridBoxPtr) &= ~0x01;
-	*(gridBoxPtr) |= 0x02;
-	int x, y, z;
-
-	for (int ni = 0; ni < numOfNeighbours; ni += 3) {
-		x = neighbourOffsets[ni];
-		y = neighbourOffsets[ni];
-		z = neighbourOffsets[ni];
-		if (xin + x >= 0 && xin + x < gridSize &&
-			yin + y >= 0 && yin + y < gridSize &&
-			zin + z >= 0 && zin + z < gridSize &&
-			!(x == 0 && y == 0 && z == 0)) {
-			gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
-			*(gridBoxPtr) -= 2 * bitShiftNum;
-		}
-	}
-
-}
-
-void generalLifeLike::editState3(int xin, int yin, int zin, unsigned char *gridBoxPtr, unsigned char* gridToEdit) {
-	*(gridBoxPtr) |= 0x01;
-	*(gridBoxPtr) |= 0x02;
-	int x, y, z;
-
-	for (int ni = 0; ni < numOfNeighbours; ni += 3) {
-		x = neighbourOffsets[ni];
-		y = neighbourOffsets[ni];
-		z = neighbourOffsets[ni];
-		if (xin + x >= 0 && xin + x < gridSize &&
-			yin + y >= 0 && yin + y < gridSize &&
-			zin + z >= 0 && zin + z < gridSize &&
-			!(x == 0 && y == 0 && z == 0)) {
-			gridBoxPtr = gridToEdit + xin + x + (yin + y) * gridSize + (zin + z) * gridSize * gridSize;
-			*(gridBoxPtr) += 2 * bitShiftNum;
-		}
-	}
-}
-*/
-
 
 
 void generalLifeLike::updateGrid() {
@@ -398,14 +200,14 @@ void generalLifeLike::updateGrid() {
 
 	//creating a temporary grid copy so that the current grid is not overwritten while updating
 	m.lock();
-	if (!is2d) memcpy(tempgrid, grid, gridSize * gridSize * gridSize);
-	else memcpy(tempgrid, grid, gridSize * gridSize);
+	if (!is2d) memcpy(swapGrid, grid, gridSize * gridSize * gridSize);
+	else memcpy(swapGrid, grid, gridSize * gridSize);
 	
 	m.unlock();
 
 	//std::tuple <glm::vec3, int> temp;
 	int x, y = 0;
-	gridPtr = tempgrid;
+	gridPtr = swapGrid;
 	for (int z = 0; z < gridSize; z++) {
 		y = 0;
 		do {
@@ -421,7 +223,7 @@ void generalLifeLike::updateGrid() {
 				if ((*gridPtr & compareNum) == 0) {
 					for (int num : born) {
 						if (neighbours == num) {
-							editBox(x, y, z, 1);
+							addNewCell(x, y, z, false);
 							goto next;
 						}
 
@@ -432,11 +234,10 @@ void generalLifeLike::updateGrid() {
 					for (int num : survives) {
 						if (neighbours == num)  goto next;
 					}
-					editBox(x, y, z, 2);
-					//editBox(x, y, z, 0);
+					decayCell(x, y, z, false);
 				}
 				else if ((*gridPtr & compareNum) > 0) {
-					editBox(x, y, z, 2);
+					decayCell(x, y, z, false);
 				}
 
 			next:;
@@ -456,11 +257,12 @@ void generalLifeLike::updateGrid() {
 void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 
 	unsigned char* gridPtr;
-	gridPtr = tempgrid;
+	gridPtr = swapGrid;
 	int y, x = 0;
 	int neighbours;
 	m.lock();
-	float mult_num = 1.0 / gridSize;
+	//float mult_num = 1.0 / gridSize;
+
 	for (int z = 0; z < gridSize; z++)
 	{
 		y = 0;
@@ -475,9 +277,6 @@ void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 
 
 				if ((*gridPtr & compareNum) != 0) {
-					//neighbours = *gridPtr >> bitShiftNum;
-					//std::cout << "neigherbours: " << neighbours << " compare num: " << compareNum << " compare and grid: " << (*gridPtr & compareNum) << "grid" << (*gridPtr - (neighbours << bitShiftNum)) << " decay" << decayStateNum << "\n";
-
 					glm::mat4 model = glm::mat4(1.0f);
 					//translate the box to the right position. adding .5 since the boxes are centered at the passed in vector
 					model = glm::translate(model, glm::vec3(x + 0.5, y + 0.5, z + 0.5));
@@ -485,9 +284,9 @@ void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 					shaderProgram.setMat4("model", model);
 
 					//glm::vec3 boxColor = glm::vec3(neighbours * 0.1, neighbours * 0.15, 1);
-					glm::vec3 boxColor = glm::vec3(x * mult_num, y * mult_num, z * mult_num);
+					//glm::vec3 boxColor = glm::vec3(x * mult_num, y * mult_num, z * mult_num);
 
-					shaderProgram.setVec3("inColor", boxColor);
+					//shaderProgram.setVec3("inColor", boxColor);
 					//draw the box
 					glBindVertexArray(VAO);
 					glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -510,3 +309,299 @@ void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 	//Sleep(10);
 
 }
+
+
+
+
+//--------------------------------------------------------------Getters--------------------------------------------------------------------------------------------------------
+
+bool generalLifeLike::inGrid(int x, int y, int z) {
+	return (x > 0 && y > 0
+		&& z > 0 && x < gridSize
+		&& y < gridSize && z < gridSize);
+}
+
+int generalLifeLike::getGridSize1d() {
+	return gridSize;
+}
+
+int generalLifeLike::getFullGridSize() {
+	return fullGridSize;
+}
+
+std::vector<int> generalLifeLike::getBorn() {
+	return born;
+}
+
+std::vector<int> generalLifeLike::getSurvives() {
+	return survives;
+}
+
+std::vector<int> generalLifeLike::getNeighbours() {
+	return neighbourOffsets;
+}
+
+int generalLifeLike::getNumOfDecayStates() {
+	return decayStateNum;
+}
+
+
+//--------------------------------------------Setters----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+void generalLifeLike::resetAllDecayingCells() {
+	unsigned char* gridPtr;
+	gridPtr = swapGrid;
+
+	m.lock();
+	int x, y;
+	for (int z = 0; z < gridSize; z++)
+	{
+		y = 0;
+		do {
+			x = 0;
+			do {
+
+				while (*gridPtr == 0) {
+					gridPtr++;
+					if (++x >= gridSize) goto rowDone;
+				}
+
+				if ((*gridPtr & compareNum) > 0) {
+					removeCell(x, y, z, false);
+					addNewCell(z, y, z, false);
+				}
+				
+				gridPtr++;
+				x++;
+
+			} while (x < gridSize);
+		rowDone:;
+			y++;
+		} while (y < gridSize);
+
+		if (is2d) goto skip;
+
+	}
+
+skip:;
+	//std::cout << sizeof(unsigned int) << " " << sizeof(unsigned char) << " \n";
+	m.unlock();
+}
+
+void generalLifeLike::setBorn(std::vector<int> b) {
+	if (paused){
+		born = b;
+	}
+}
+
+void generalLifeLike::setSurvives(std::vector<int> s) {
+	if (paused) {
+		survives = s;
+	}
+}
+
+void generalLifeLike::setNeighbours(std::vector<glm::vec3> neighs) {
+	if (paused) {
+		for (glm::vec3 neighbour : neighs) {
+
+			if (!is2d) addToNeighbours(neighbour.x, neighbour.y, neighbour.z);
+			else addToNeighbours(neighbour.x, neighbour.y);
+
+			if (numOfNeighbours > numOfTotalPossibleNeighbours) break;
+		}
+	}
+}
+
+void generalLifeLike::setDecayStates(int decayStates, std::vector<glm::vec3> initialNeighbours) {
+	if (paused) {
+		decayStateNum = decayStates;
+		bitShiftNum = 1;
+		neighbourBitShiftNum = 1;
+		while (decayStateNum > neighbourBitShiftNum) {
+			bitShiftNum++;
+			neighbourBitShiftNum *= 2;
+		}
+		compareNum = neighbourBitShiftNum * 2 - 1;
+
+		//Calculate the number of neighbours possible given the number of decay states
+		numOfTotalPossibleNeighbours = 255 - std::pow(2, bitShiftNum);
+		std::cout << "With the current number of decay states, you can have at most: " << numOfTotalPossibleNeighbours << " neighbours for a cell. \n";
+
+		if (numOfTotalPossibleNeighbours < 1) {
+			std::cout << "ERROR :: TOO MANY DECAY STATES \n";
+		}
+
+		/*
+		if (initialNeighbours.size() < numOfTotalPossibleNeighbours) {
+			std::vector<int> tempNeighbour(initialNeighbours.size() * 3, 0);
+			neighbourOffsets = tempNeighbour;
+		}
+		else {
+			std::vector<int> tempNeighbour(numOfTotalPossibleNeighbours * 3, 0);
+			neighbourOffsets = tempNeighbour;
+		}
+		*/
+		//this resizes the neighbours vector if the number of neighbour offsets is now too large
+		if (gridSetup) {
+
+
+
+			resetAllDecayingCells();
+		}
+
+		
+	}
+}
+
+void generalLifeLike::setUpGrid(int gridSz) {
+	
+}
+
+
+void generalLifeLike::resizeGrid(int newGridSize) {
+	if (paused) {
+		int tempFullGridSize;
+		if (is2d) {
+			//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
+			tempFullGridSize = newGridSize;
+		}
+		else {
+			tempFullGridSize = newGridSize;
+		}
+
+		//creating the char arrays for the grids themselves
+		unsigned char* newGrid = new unsigned char[tempFullGridSize];
+		unsigned char* newTempGrid = new unsigned char[tempFullGridSize];
+
+		unsigned char* gridPtr;
+		gridPtr = swapGrid;
+
+		if (newGridSize >= gridSize) {
+			m.lock();
+			int x, y;
+			for (int z = 0; z < gridSize; z++)
+			{
+				y = 0;
+				do {
+					x = 0;
+					do {
+
+						while (*gridPtr == 0) {
+							gridPtr++;
+							if (++x >= gridSize) goto rowDone;
+						}
+
+
+
+						gridPtr++;
+						x++;
+
+					} while (x < gridSize);
+				rowDone:;
+					y++;
+				} while (y < gridSize);
+
+				if (is2d) goto skip;
+
+			}
+
+			skip:;
+			//std::cout << sizeof(unsigned int) << " " << sizeof(unsigned char) << " \n";
+			m.unlock();
+
+			gridSize = newGridSize;
+			memset(grid, 0, fullGridSize);
+			gridCenter = int(gridSize / 2);
+
+			memcpy(swapGrid, grid, fullGridSize);
+		}
+	}
+	
+}
+
+//--------------------------------------------Mutators------------------------------------------------------------------------------------------------------------------------------------------------- 
+
+void addBlocks(std::vector<int>& listToEdit, int numToAdd, int optionalEndRange) {
+	if (numToAdd > 0 && optionalEndRange > numToAdd) {
+		for (int i = numToAdd; i < optionalEndRange; i++) {
+			listToEdit.push_back(i);
+		}
+	}
+	else if (numToAdd > 0) {
+		listToEdit.push_back(numToAdd);
+	}
+}
+
+void removeBlocks(std::vector<int>& listToEdit, int numToRemove) {
+	std::vector<int> indexsToRemove{};
+		for (int i = 0; i < listToEdit.size(); i++) {
+			if (listToEdit[i] == numToRemove) {
+				indexsToRemove.push_back(i);
+			}
+		}
+		int numRemoved = 0;
+		for (int i : indexsToRemove) {
+			listToEdit.erase(listToEdit.begin() + i - numRemoved);
+			numRemoved++;
+		}
+}
+
+void generalLifeLike::addBlocksToBorn(int numToAdd, int optionalEndRange) {
+	if (paused) {
+		addBlocks(born, numToAdd, optionalEndRange);
+	}
+}
+
+void generalLifeLike::removeBlocksFromBorn(int numToRemove) {
+	if (paused) {
+		removeBlocks(born, numToRemove);
+	}
+}
+
+void generalLifeLike::addBlocksToSurvives(int numToAdd, int optionalEndRange) {
+		if (paused) {
+			addBlocks(survives, numToAdd, optionalEndRange);
+		}
+}
+
+void generalLifeLike::removeBlocksFromSurvives(int numToRemove) {
+	if (!paused) {
+		removeBlocks(survives, numToRemove);
+	}
+}
+void generalLifeLike::addToNeighbours(int x, int y, int z) {
+	//This function adds a new neighbour offset to the list of offsets. z is set to zero by default incase the list is 2d, and the z value is not given
+
+	bool alreadyInList = false;
+
+	//First, it checks if the offset is already in the list. If it is, then it won't add the new block
+	for (int ni = 0; ni < numOfNeighbours; ni++) {
+		if (neighbourOffsets[ni] == x && neighbourOffsets[ni + 1] == y && neighbourOffsets[ni + 2] == z) {
+			alreadyInList = true;
+			break;
+		}
+	}
+	//If it's not in the list, then it is added
+	if (!alreadyInList) {
+		neighbourOffsets.push_back(x);
+		neighbourOffsets.push_back(y);
+		neighbourOffsets.push_back(z);
+		numOfNeighbours++;
+	}
+	
+}
+
+void generalLifeLike::removeFromNeighbours(int x, int y, int z) {
+	//This function searches the list of neighbours and removes the neighbour offset if it is found.
+
+	for (int ni = 0; ni < numOfNeighbours; ni++) {
+		if (neighbourOffsets[ni] == x && neighbourOffsets[ni + 1] == y && neighbourOffsets[ni + 2] == z) {
+			neighbourOffsets.erase(neighbourOffsets.begin() + ni);
+			neighbourOffsets.erase(neighbourOffsets.begin() + ni);
+			neighbourOffsets.erase(neighbourOffsets.begin() + ni);
+			break;
+		}
+	}
+}
+
+

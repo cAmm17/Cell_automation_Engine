@@ -185,8 +185,10 @@ int main()
 
 	glm::mat4 gridModel = glm::mat4(1.0f);
 
-	gridModel = glm::translate(gridModel, glm::vec3(gameGrid->gridSize / 2, gameGrid->gridSize / 2, gameGrid->gridSize / 2));
-	gridModel = glm::scale(gridModel, glm::vec3(gameGrid->gridSize, gameGrid->gridSize, gameGrid->gridSize));
+	int gridRowSize = gameGrid->getGridSize1d();
+
+	gridModel = glm::translate(gridModel, glm::vec3(gridRowSize / 2, gridRowSize / 2, gridRowSize / 2));
+	gridModel = glm::scale(gridModel, glm::vec3(gridRowSize, gridRowSize, gridRowSize));
 
 	std::thread updater(updateCurGrid);
 	float mousex, mousey, mousez;
@@ -230,9 +232,7 @@ int main()
 		mousex = int(programCamera->cameraPos.x + programCamera->cameraFront.x * 3) + .5;
 		mousey = int(programCamera->cameraPos.y + programCamera->cameraFront.y * 3) + .5;
 		mousez = int(programCamera->cameraPos.z + programCamera->cameraFront.z * 3) + .5;
-		if (mousex > 0 && mousey > 0
-			&& mousez > 0 && mousex < gameGrid->gridSize
-			&& mousey < gameGrid->gridSize && mousez < gameGrid->gridSize && !gameGrid->notPaused && !hidden) 
+		if (gameGrid->inGrid(mousex, mousey, mousez) && gameGrid->paused && !hidden) 
 		{
 			glm::mat4 mouseoverModel = glm::mat4(1.0f);
 			mouseoverModel = glm::translate(mouseoverModel, glm::vec3(mousex, mousey, mousez));
@@ -272,28 +272,28 @@ void processInput(GLFWwindow *window)
 	programCamera->ProcessKeyboardInput(window);
 
 	
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !gameGrid->notPaused) {
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && gameGrid->paused) {
 		float mousex = int(programCamera->cameraPos.x + programCamera->cameraFront.x * 3) + .5;
 		float mousey = int(programCamera->cameraPos.y + programCamera->cameraFront.y * 3) + .5;
 		float mousez = int(programCamera->cameraPos.z + programCamera->cameraFront.z * 3) + .5;
 		gameGrid->m.lock();
-		gameGrid->editBox(int(mousex), int(mousey), int(mousez), 1, true);
+		gameGrid->addNewCell(int(mousex), int(mousey), int(mousez), true);
 		gameGrid->m.unlock();
 	}
 	
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS && !gameGrid->notPaused) {
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS && gameGrid->paused) {
 		float mousex = int(programCamera->cameraPos.x + programCamera->cameraFront.x * 3) + .5;
 		float mousey = int(programCamera->cameraPos.y + programCamera->cameraFront.y * 3) + .5;
 		float mousez = int(programCamera->cameraPos.z + programCamera->cameraFront.z * 3) + .5;
 		gameGrid->m.lock();
-		gameGrid->editBox(int(mousex), int(mousey), int(mousez), 0, true);
+		gameGrid->removeCell(int(mousex), int(mousey), int(mousez), true);
 		gameGrid->m.unlock();
 	}
 
 	
 	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS)
 	{
-		gameGrid->notPaused = !gameGrid->notPaused;
+		gameGrid->paused = !gameGrid->paused;
 	}
 		
 
@@ -312,7 +312,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
 void updateCurGrid() {
 	while (gameGrid->update) {
-		if (gameGrid->notPaused) {
+		if (!gameGrid->paused) {
 			gameGrid->updateGrid();
 			Sleep(200);
 		}
@@ -324,3 +324,4 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	glViewport(0, 0, width, height);
 }
+
