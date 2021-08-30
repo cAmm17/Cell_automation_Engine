@@ -1,7 +1,9 @@
 #include "main.h"
+#include "menu.h"
 #include "Shader.h"
 #include "Camera.h"
-#include "gridManager.h"
+#include "generalLifeLike.h"
+#include "imgui.h"
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
@@ -16,8 +18,13 @@ static bool hidden = false;
 static Camera *programCamera = new Camera(glm::vec3(0.0f, 0.0f, -3.0f), glm::vec3(10.0f, 10.0f, 10.0f),
 	glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
+static menu *gridMenu = new menu();
+
 int main()
 {
+	//Initialize the grid manager for the game
+	int gridSz = 50;
+	bool twoD = false;
 	float update_rate = 0.5;
 	//Setting shader paths
 	const char* vertexShaderPath = "3.3.shader.vs";
@@ -113,12 +120,10 @@ int main()
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
+
 	//Initialize the shader
 	Shader shaderProgram = Shader::Shader(vertexShaderPath, fragmentShaderPath);
 	shaderProgram.use();
-
-	//Initialize the grid manager for the game
-	int gridSz = 50;
 
 	//test for grid, remove later
 	std::vector<glm::vec3> startBlock;
@@ -142,7 +147,7 @@ int main()
 	for (int x = 0; x < 20; x++) {
 		for (int y = 0; y < 20; y++) {
 			for (int z = 0; z < 20; z++) {
-					startBlock.push_back(glm::vec3(x + 5, y + 5, z + 5));
+					startBlock.push_back(glm::vec3(x, y, z));
 			}
 		}
 	}
@@ -171,7 +176,7 @@ int main()
 	std::vector<int> survives{ 1,4,8,11,13,14,15,16,17,18,19,20,21,22,23,24,25,26};
 	std::vector<int> born{13,14,15,16,17,18,19,20,21,22,23,24,25,26};
 
-	gameGrid = new generalLifeLike(gridSz, startBlock, initNeigh, 2, survives, born, false);
+	gameGrid = new generalLifeLike(gridSz, startBlock, initNeigh, 4, survives, born, false);
 	
 
 	//gameGrid.initializeGrid(8, startBlock);
@@ -193,6 +198,8 @@ int main()
 	std::thread updater(updateCurGrid);
 	float mousex, mousey, mousez;
 
+	gridMenu->setupGui(window, "#version 330 core", gameGrid);
+
 	//Render loop
 	while (!glfwWindowShouldClose(window))
 	{
@@ -206,6 +213,10 @@ int main()
 		//Checks for user input
 		processInput(window);
 
+		if (gridMenu->showMenu) {
+			gridMenu->renderGui();
+		}
+
 		//Game running functions here
 		shaderProgram.use();
 
@@ -218,7 +229,7 @@ int main()
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		gameGrid->render(VAO, shaderProgram);
 
-		//Drawing the box outline
+		//Drawing the grid outline
 		glm::vec3 boxColor = glm::vec3(0.9f, 0.9f, 1.0f);
 		shaderProgram.setVec3("inColor", boxColor);
 
@@ -253,6 +264,8 @@ int main()
 	gameGrid->update = false;
 	//if(updater.joinable())
 	updater.join();
+
+	gridMenu->cleanupGui();
 
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
@@ -300,6 +313,19 @@ void processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
 	{
 		hidden = !hidden;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
+	{
+		gridMenu->showMenu = !gridMenu->showMenu;
+		if (gridMenu->showMenu) {
+			gameGrid->paused = true;
+			hidden = true;
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+		}
+		else {
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)

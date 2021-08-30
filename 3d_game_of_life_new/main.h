@@ -11,6 +11,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-class gridManager;
+class generalLifeLike;
 class Shader;
 class Camera;
+
+glm::mat4* calculateOffsets(int gridSize, bool is2d);

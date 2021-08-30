@@ -20,7 +20,7 @@ Todo:
 	-Add menu window for options (eventually)
 
 */
-#include "gridManager.h"
+#include "generalLifeLike.h"
 
 //defining the type for the grid. It is a dynamic array of tuples. Each tuple contains the location
 //of the box (generated when the grid is first created) and an int (0 or 1) determining if a box should
@@ -66,6 +66,9 @@ generalLifeLike::generalLifeLike(int gridsz, std::vector<glm::vec3> initialBoxes
 		if (!is2d) addNewCell(int(box.x), int(box.y), int(box.z), false);
 		else addNewCell(int(box.x), int(box.y), 0, false);
 	}
+
+	modelMatrices = new glm::mat4[fullGridSize];
+	modelMatrices = calculateOffsets(gridSize, is2d);
 
 	//copys data from the temp grid to the new grid
 	memcpy(swapGrid, grid, fullGridSize);
@@ -277,9 +280,10 @@ void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 
 
 				if ((*gridPtr & compareNum) != 0) {
-					glm::mat4 model = glm::mat4(1.0f);
+					glm::mat4 model = modelMatrices[x + y * gridSize + z * gridSize * gridSize];
+					//glm::mat4 model = glm::mat4(1.0f);
 					//translate the box to the right position. adding .5 since the boxes are centered at the passed in vector
-					model = glm::translate(model, glm::vec3(x + 0.5, y + 0.5, z + 0.5));
+					//model = glm::translate(model, glm::vec3(x + 0.5, y + 0.5, z + 0.5));
 					//assign the model uniform
 					shaderProgram.setMat4("model", model);
 
@@ -312,6 +316,24 @@ void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 
 
 
+glm::mat4* calculateOffsets(int gridSize, bool is2d) {
+	glm::mat4 *translations;
+	if (is2d) translations = new glm::mat4[gridSize * gridSize];
+	else translations = new glm::mat4[gridSize * gridSize * gridSize];
+
+	for (int z = 0; z < gridSize; z++) {
+		for (int y = 0; y < gridSize; y++) {
+			for (int x = 0; x < gridSize; x++) {
+				glm::mat4 model = glm::mat4(1.0f);
+				model = glm::translate(model, glm::vec3(x + 0.5, y + 0.5, z + 0.5));
+				translations[x + y * gridSize + z * gridSize * gridSize] = model;
+			}
+		}
+		if (is2d) goto skip;
+	}
+	skip:;
+	return translations;
+}
 
 //--------------------------------------------------------------Getters--------------------------------------------------------------------------------------------------------
 
@@ -343,6 +365,10 @@ std::vector<int> generalLifeLike::getNeighbours() {
 
 int generalLifeLike::getNumOfDecayStates() {
 	return decayStateNum;
+}
+
+bool generalLifeLike::getIs2d() {
+	return is2d;
 }
 
 
@@ -559,13 +585,13 @@ void generalLifeLike::removeBlocksFromBorn(int numToRemove) {
 }
 
 void generalLifeLike::addBlocksToSurvives(int numToAdd, int optionalEndRange) {
-		if (paused) {
-			addBlocks(survives, numToAdd, optionalEndRange);
-		}
+	if (paused) {
+		addBlocks(survives, numToAdd, optionalEndRange);
+	}
 }
 
 void generalLifeLike::removeBlocksFromSurvives(int numToRemove) {
-	if (!paused) {
+	if (paused) {
 		removeBlocks(survives, numToRemove);
 	}
 }
