@@ -187,14 +187,6 @@ int main()
 	shaderProgram.setMat4("projection", projection);
 	
 	
-
-	glm::mat4 gridModel = glm::mat4(1.0f);
-
-	int gridRowSize = gameGrid->getGridSize1d();
-
-	gridModel = glm::translate(gridModel, glm::vec3(gridRowSize / 2, gridRowSize / 2, gridRowSize / 2));
-	gridModel = glm::scale(gridModel, glm::vec3(gridRowSize, gridRowSize, gridRowSize));
-
 	std::thread updater(updateCurGrid);
 	float mousex, mousey, mousez;
 
@@ -213,11 +205,7 @@ int main()
 		//Checks for user input
 		processInput(window);
 
-		if (gridMenu->showMenu) {
-			gridMenu->renderGui();
-		}
-
-		//Game running functions here
+		
 		shaderProgram.use();
 
 		glm::mat4 view = glm::mat4(1.0f);
@@ -225,19 +213,8 @@ int main()
 		shaderProgram.setMat4("view", view);
 
 
-		glBindVertexArray(VAO);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		gameGrid->render(VAO, shaderProgram);
-
-		//Drawing the grid outline
-		glm::vec3 boxColor = glm::vec3(0.9f, 0.9f, 1.0f);
-		shaderProgram.setVec3("inColor", boxColor);
-
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		shaderProgram.setMat4("model", gridModel);
-
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
+		gameGrid->renderGridOutline(VAO, shaderProgram);
 
 
 		mousex = int(programCamera->cameraPos.x + programCamera->cameraFront.x * 3) + .5;
@@ -255,7 +232,10 @@ int main()
 			glDrawArrays(GL_TRIANGLES, 0, 36);
 		}
 
-		
+		if (gridMenu->showMenu) {
+			gridMenu->renderGui();
+		}
+
 
 		//Swap drawing and displayed buffer
 		glfwSwapBuffers(window);

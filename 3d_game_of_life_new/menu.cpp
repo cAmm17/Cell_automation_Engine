@@ -22,6 +22,9 @@ void menu::renderGui() {
 
 	ImGui::Begin("Grid Options");
 	if (ImGui::BeginMenu("Current Grid Stats")) {
+		ImGui::Text("Current number of decay states: ");
+		ImGui::SameLine();
+		ImGui::Text(std::to_string(grid->getNumOfDecayStates()).c_str());
 		int tempCount = 1;
 		ImGui::Text("Survival States");
 		char buffer[10];
@@ -121,6 +124,11 @@ void menu::renderGui() {
 			}
 
 		}
+
+
+		//reset grid
+		//Change num decay states
+		//default neighbourhoods - 2 types (direct contact and direct + diaganol
 
 		ImGui::EndMenu();
 	}

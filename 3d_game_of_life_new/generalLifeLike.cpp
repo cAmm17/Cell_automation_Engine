@@ -73,10 +73,17 @@ generalLifeLike::generalLifeLike(int gridsz, std::vector<glm::vec3> initialBoxes
 	//copys data from the temp grid to the new grid
 	memcpy(swapGrid, grid, fullGridSize);
 
+	setupGridOutlineModel();
 	gridSetup = true;
 	
 }
 
+
+void generalLifeLike::setupGridOutlineModel() {
+	gridOutlineModel = glm::mat4(1.0f);
+	gridOutlineModel = glm::translate(gridOutlineModel, glm::vec3(gridSize / 2, gridSize / 2, gridSize / 2));
+	gridOutlineModel = glm::scale(gridOutlineModel, glm::vec3(gridSize, gridSize, gridSize));
+}
 
 int generalLifeLike::getState(int xin, int yin, int zin) const {
 	unsigned char *gridBoxPtr;
@@ -259,6 +266,9 @@ void generalLifeLike::updateGrid() {
 
 void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 
+	glBindVertexArray(VAO);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
 	unsigned char* gridPtr;
 	gridPtr = swapGrid;
 	int y, x = 0;
@@ -314,7 +324,18 @@ void generalLifeLike::render(unsigned int &VAO, Shader &shaderProgram) {
 
 }
 
+void generalLifeLike::renderGridOutline(unsigned int &VAO, Shader &shaderProgram) {
+	
+	//Drawing the grid outline
+	glm::vec3 boxColor = glm::vec3(0.9f, 0.9f, 1.0f);
+	shaderProgram.setVec3("inColor", boxColor);
 
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	shaderProgram.setMat4("model", gridOutlineModel);
+
+	glBindVertexArray(VAO);
+	glDrawArrays(GL_TRIANGLES, 0, 36);
+}
 
 glm::mat4* calculateOffsets(int gridSize, bool is2d) {
 	glm::mat4 *translations;
@@ -457,20 +478,14 @@ void generalLifeLike::setDecayStates(int decayStates, std::vector<glm::vec3> ini
 			std::cout << "ERROR :: TOO MANY DECAY STATES \n";
 		}
 
-		/*
-		if (initialNeighbours.size() < numOfTotalPossibleNeighbours) {
-			std::vector<int> tempNeighbour(initialNeighbours.size() * 3, 0);
-			neighbourOffsets = tempNeighbour;
-		}
-		else {
-			std::vector<int> tempNeighbour(numOfTotalPossibleNeighbours * 3, 0);
-			neighbourOffsets = tempNeighbour;
-		}
-		*/
 		//this resizes the neighbours vector if the number of neighbour offsets is now too large
 		if (gridSetup) {
-
-
+			while (numOfTotalPossibleNeighbours < numOfNeighbours) {
+				neighbourOffsets.pop_back();
+				neighbourOffsets.pop_back();
+				neighbourOffsets.pop_back();
+				numOfNeighbours--;
+			}
 
 			resetAllDecayingCells();
 		}
@@ -630,4 +645,53 @@ void generalLifeLike::removeFromNeighbours(int x, int y, int z) {
 	}
 }
 
+
+void createMooreNeighbourhood() {
+	if (paused) {
+		while (numOfNeighbours > 0) {
+			neighbourOffsets.pop_back();
+			neighbourOffsets.pop_back();
+			neighbourOffsets.pop_back();
+			numOfNeighbours--;
+		}
+
+		for (int x = -1; x < 2; x++) {
+			for (int y = -1; y < 2; y++) {
+				for (int z = -1; z < 2; z++) {
+					if (!(x == 0 && y == 0 && z == 0)) {
+						addToNeighbours(x, y, z);
+					}
+
+				}
+			}
+		}
+	}
+
+}
+
+void createVonNeumanNeighbourhood() {
+	if (paused) {
+		while (numOfNeighbours > 0) {
+			neighbourOffsets.pop_back();
+			neighbourOffsets.pop_back();
+			neighbourOffsets.pop_back();
+			numOfNeighbours--;
+		}
+
+		addToNeighbours(-1, 0, 0);
+		addToNeighbours(0, -1, 0);
+		addToNeighbours(1, 0, 0);
+		addToNeighbours(0, 1, 0);
+		if (!is2d) {
+			addToNeighbours(0, 0, 1);
+			addToNeighbours(0, 0, -1);
+		}
+	
+	}
+	
+}
+
+void generateRandomSeed(int numBlocksToGenerate) {
+
+}
 
