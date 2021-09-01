@@ -23,6 +23,10 @@ private:
 	int removeNeighbourZ = 0;
 	int rmvBirthStates = 0;
 	int rmvSurvStates = 0;
+	int newGridSize = 0;
+	int newDecayStates = 0;
+	int numCellsToAdd = 0;
+	bool newGrid2d = false;
 
 
 public:

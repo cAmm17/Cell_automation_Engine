@@ -125,8 +125,43 @@ void menu::renderGui() {
 
 		}
 
+		//clear neighbours
+		if (ImGui::Button("Remove All Neighbours")) {
+			grid->removeAllNeighbours();
+		}
 
 		//reset grid
+		if (ImGui::Button("Clear and Reset Grid")) {
+			grid->resetGrid();
+		}
+
+		ImGui::InputInt("New Grid Size (input one side's dimension, must be between 1 and 100)", &newGridSize);
+		ImGui::Checkbox("Should the new grid be 2d?", &newGrid2d);
+		if (ImGui::Button("Clear, Reset, and Resize the current grid")) {
+			if (newGridSize > 0 && newGridSize < 101) {
+				grid->resetGrid(newGridSize, newGrid2d);
+			}
+			
+		}
+
+		if (ImGui::Button("Create Moore Neighbourhood")) {
+			grid->createMooreNeighbourhood();
+		}
+		if (ImGui::Button("Create Von Neuman Neighbourhood")) {
+			grid->createVonNeumanNeighbourhood();
+		}
+
+		ImGui::InputInt("New Num of decay states", &newDecayStates);
+		if (ImGui::Button("Change number of decay states a cell goes through")) {
+			grid->setDecayStates(newDecayStates);
+		}
+
+		ImGui::InputInt("Number of cells to add", &numCellsToAdd);
+		if (ImGui::Button("Fill grid with random cells")) {
+			if (numCellsToAdd > 0 && numCellsToAdd < 100000) {
+				grid->generateRandomSeed(numCellsToAdd);
+			}
+		}
 		//Change num decay states
 		//default neighbourhoods - 2 types (direct contact and direct + diaganol
 

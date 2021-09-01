@@ -459,7 +459,7 @@ void generalLifeLike::setNeighbours(std::vector<glm::vec3> neighs) {
 	}
 }
 
-void generalLifeLike::setDecayStates(int decayStates, std::vector<glm::vec3> initialNeighbours) {
+void generalLifeLike::setDecayStates(int decayStates) {
 	if (paused) {
 		decayStateNum = decayStates;
 		bitShiftNum = 1;
@@ -645,8 +645,16 @@ void generalLifeLike::removeFromNeighbours(int x, int y, int z) {
 	}
 }
 
+void generalLifeLike::removeAllNeighbours() {
+	while (numOfNeighbours > 0) {
+		neighbourOffsets.pop_back();
+		neighbourOffsets.pop_back();
+		neighbourOffsets.pop_back();
+		numOfNeighbours--;
+	}
+}
 
-void createMooreNeighbourhood() {
+void generalLifeLike::createMooreNeighbourhood() {
 	if (paused) {
 		while (numOfNeighbours > 0) {
 			neighbourOffsets.pop_back();
@@ -669,7 +677,7 @@ void createMooreNeighbourhood() {
 
 }
 
-void createVonNeumanNeighbourhood() {
+void generalLifeLike::createVonNeumanNeighbourhood() {
 	if (paused) {
 		while (numOfNeighbours > 0) {
 			neighbourOffsets.pop_back();
@@ -691,7 +699,58 @@ void createVonNeumanNeighbourhood() {
 	
 }
 
-void generateRandomSeed(int numBlocksToGenerate) {
-
+void generalLifeLike::generateRandomSeed(int numBlocksToGenerate) {
+	int x, y, z;
+	for (int i = 0; i < numBlocksToGenerate; i++) {
+		x = rand() % gridSize;
+		y = rand() % gridSize;
+		z = rand() % gridSize;
+		if (!is2d) addNewCell(x, y, z, false);
+		else addNewCell(x, y, 0, false);
+	}
 }
 
+//Resets exisiting grid to be empty
+void generalLifeLike::resetGrid() {
+	if (is2d) {
+		//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
+		fullGridSize = gridSize * gridSize;
+	}
+	else {
+		fullGridSize = gridSize * gridSize * gridSize;
+	}
+
+	grid = new unsigned char[fullGridSize];
+	swapGrid = new unsigned char[fullGridSize];
+
+	modelMatrices = new glm::mat4[fullGridSize];
+	modelMatrices = calculateOffsets(gridSize, is2d);
+
+	//copys data from the temp grid to the new grid
+	memcpy(swapGrid, grid, fullGridSize);
+
+	setupGridOutlineModel();
+}
+
+//Creates a new grid of requested size
+void generalLifeLike::resetGrid(int newGridSize, bool twoD) {
+	is2d = twoD;
+	if (is2d) {
+		//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
+		fullGridSize = newGridSize * newGridSize;
+	}
+	else {
+		fullGridSize = newGridSize * newGridSize * newGridSize;
+	}
+
+	grid = new unsigned char[fullGridSize];
+	swapGrid = new unsigned char[fullGridSize];
+
+	modelMatrices = new glm::mat4[fullGridSize];
+	modelMatrices = calculateOffsets(gridSize, is2d);
+
+	//copys data from the temp grid to the new grid
+	memcpy(swapGrid, grid, fullGridSize);
+
+	setupGridOutlineModel();
+}
