@@ -98,6 +98,7 @@ public:
 	void removeBlocksFromSurvives(int numToAdd);
 	void addToNeighbours(int x, int y, int z = 0);
 	void removeFromNeighbours(int x, int y, int z = 0);
+	void removeAllNeighbours();
 
 	void addNewCell(int xin, int yin, int zin, bool playerEdit);
 	void decayCell(int xin, int yin, int zin, bool playerEdit);

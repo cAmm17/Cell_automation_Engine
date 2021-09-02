@@ -173,8 +173,8 @@ int main()
 	initNeigh.push_back(glm::vec3(-1, 0, 0));
 	*/
 
-	std::vector<int> survives{ 1,4,8,11,13,14,15,16,17,18,19,20,21,22,23,24,25,26};
-	std::vector<int> born{13,14,15,16,17,18,19,20,21,22,23,24,25,26};
+	std::vector<int> survives{ 4, 6, 8};
+	std::vector<int> born{5, 6};
 
 	gameGrid = new generalLifeLike(gridSz, startBlock, initNeigh, 4, survives, born, false);
 	
@@ -213,28 +213,29 @@ int main()
 		shaderProgram.setMat4("view", view);
 
 
-		gameGrid->render(VAO, shaderProgram);
-		gameGrid->renderGridOutline(VAO, shaderProgram);
-
-
-		mousex = int(programCamera->cameraPos.x + programCamera->cameraFront.x * 3) + .5;
-		mousey = int(programCamera->cameraPos.y + programCamera->cameraFront.y * 3) + .5;
-		mousez = int(programCamera->cameraPos.z + programCamera->cameraFront.z * 3) + .5;
-		if (gameGrid->inGrid(mousex, mousey, mousez) && gameGrid->paused && !hidden) 
-		{
-			glm::mat4 mouseoverModel = glm::mat4(1.0f);
-			mouseoverModel = glm::translate(mouseoverModel, glm::vec3(mousex, mousey, mousez));
-
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-			shaderProgram.setMat4("model", mouseoverModel);
-
-			glBindVertexArray(VAO);
-			glDrawArrays(GL_TRIANGLES, 0, 36);
-		}
-
 		if (gridMenu->showMenu) {
 			gridMenu->renderGui();
 		}
+		else {
+			gameGrid->render(VAO, shaderProgram);
+			gameGrid->renderGridOutline(VAO, shaderProgram);
+
+			mousex = int(programCamera->cameraPos.x + programCamera->cameraFront.x * 3) + .5;
+			mousey = int(programCamera->cameraPos.y + programCamera->cameraFront.y * 3) + .5;
+			mousez = int(programCamera->cameraPos.z + programCamera->cameraFront.z * 3) + .5;
+			if (gameGrid->inGrid(mousex, mousey, mousez) && gameGrid->paused && !hidden)
+			{
+				glm::mat4 mouseoverModel = glm::mat4(1.0f);
+				mouseoverModel = glm::translate(mouseoverModel, glm::vec3(mousex, mousey, mousez));
+
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+				shaderProgram.setMat4("model", mouseoverModel);
+
+				glBindVertexArray(VAO);
+				glDrawArrays(GL_TRIANGLES, 0, 36);
+			}
+		}
+
 
 
 		//Swap drawing and displayed buffer
@@ -297,7 +298,7 @@ void processInput(GLFWwindow *window)
 
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
 	{
-		gridMenu->showMenu = !gridMenu->showMenu;
+		gridMenu->showMenu = true;
 		if (gridMenu->showMenu) {
 			gameGrid->paused = true;
 			hidden = true;
@@ -306,6 +307,11 @@ void processInput(GLFWwindow *window)
 		else {
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		}
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+		gridMenu->showMenu = false;
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)

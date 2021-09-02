@@ -35,7 +35,7 @@ generalLifeLike::generalLifeLike(int gridsz, std::vector<glm::vec3> initialBoxes
 	paused = true;
 	gridSetup = false;
 
-	setDecayStates(decayStates, initialNeighbours);
+	setDecayStates(decayStates);
 
 	if (is2d) {
 		//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
@@ -461,6 +461,7 @@ void generalLifeLike::setNeighbours(std::vector<glm::vec3> neighs) {
 
 void generalLifeLike::setDecayStates(int decayStates) {
 	if (paused) {
+		m.lock();
 		decayStateNum = decayStates;
 		bitShiftNum = 1;
 		neighbourBitShiftNum = 1;
@@ -490,7 +491,7 @@ void generalLifeLike::setDecayStates(int decayStates) {
 			resetAllDecayingCells();
 		}
 
-		
+		m.unlock();
 	}
 }
 
@@ -501,6 +502,7 @@ void generalLifeLike::setUpGrid(int gridSz) {
 
 void generalLifeLike::resizeGrid(int newGridSize) {
 	if (paused) {
+		m.lock();
 		int tempFullGridSize;
 		if (is2d) {
 			//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
@@ -556,6 +558,7 @@ void generalLifeLike::resizeGrid(int newGridSize) {
 
 			memcpy(swapGrid, grid, fullGridSize);
 		}
+		m.unlock();
 	}
 	
 }
@@ -646,11 +649,13 @@ void generalLifeLike::removeFromNeighbours(int x, int y, int z) {
 }
 
 void generalLifeLike::removeAllNeighbours() {
-	while (numOfNeighbours > 0) {
-		neighbourOffsets.pop_back();
-		neighbourOffsets.pop_back();
-		neighbourOffsets.pop_back();
-		numOfNeighbours--;
+	if (paused) {
+		while (numOfNeighbours > 0) {
+			neighbourOffsets.pop_back();
+			neighbourOffsets.pop_back();
+			neighbourOffsets.pop_back();
+			numOfNeighbours--;
+		}
 	}
 }
 
@@ -700,57 +705,76 @@ void generalLifeLike::createVonNeumanNeighbourhood() {
 }
 
 void generalLifeLike::generateRandomSeed(int numBlocksToGenerate) {
-	int x, y, z;
-	for (int i = 0; i < numBlocksToGenerate; i++) {
-		x = rand() % gridSize;
-		y = rand() % gridSize;
-		z = rand() % gridSize;
-		if (!is2d) addNewCell(x, y, z, false);
-		else addNewCell(x, y, 0, false);
+	if (paused) {
+		m.lock();
+		int x, y, z;
+		for (int i = 0; i < numBlocksToGenerate; i++) {
+			x = rand() % gridSize;
+			y = rand() % gridSize;
+			z = rand() % gridSize;
+			if (!is2d) addNewCell(x, y, z, true);
+			else addNewCell(x, y, 0, true);
+		}
+		m.unlock();
 	}
 }
 
 //Resets exisiting grid to be empty
 void generalLifeLike::resetGrid() {
-	if (is2d) {
-		//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
-		fullGridSize = gridSize * gridSize;
+	if (paused) {
+		m.lock();
+		if (is2d) {
+			//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
+			fullGridSize = gridSize * gridSize;
+		}
+		else {
+			fullGridSize = gridSize * gridSize * gridSize;
+		}
+
+		grid = new unsigned char[fullGridSize];
+		swapGrid = new unsigned char[fullGridSize];
+
+		modelMatrices = new glm::mat4[fullGridSize];
+		modelMatrices = calculateOffsets(gridSize, is2d);
+
+		memset(grid, 0, fullGridSize);
+		//copys data from the temp grid to the new grid
+		memcpy(swapGrid, grid, fullGridSize);
+
+		setupGridOutlineModel();
+		m.unlock();
 	}
-	else {
-		fullGridSize = gridSize * gridSize * gridSize;
-	}
-
-	grid = new unsigned char[fullGridSize];
-	swapGrid = new unsigned char[fullGridSize];
-
-	modelMatrices = new glm::mat4[fullGridSize];
-	modelMatrices = calculateOffsets(gridSize, is2d);
-
-	//copys data from the temp grid to the new grid
-	memcpy(swapGrid, grid, fullGridSize);
-
-	setupGridOutlineModel();
 }
 
 //Creates a new grid of requested size
 void generalLifeLike::resetGrid(int newGridSize, bool twoD) {
-	is2d = twoD;
-	if (is2d) {
-		//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
-		fullGridSize = newGridSize * newGridSize;
+	if (paused) {
+		m.lock();
+		is2d = twoD;
+		gridSize = newGridSize;
+		if (is2d) {
+			//if the program is set to 2d then it only needs to save the x and y coordinates of neighbours blocks
+			fullGridSize = newGridSize * newGridSize;
+		}
+		else {
+			fullGridSize = newGridSize * newGridSize * newGridSize;
+		}
+
+		delete grid;
+		delete swapGrid;
+		delete modelMatrices;
+
+		grid = new unsigned char[fullGridSize];
+		swapGrid = new unsigned char[fullGridSize];
+
+		modelMatrices = new glm::mat4[fullGridSize];
+		modelMatrices = calculateOffsets(gridSize, is2d);
+
+		memset(grid, 0, fullGridSize);
+		//copys data from the temp grid to the new grid
+		memcpy(swapGrid, grid, fullGridSize);
+
+		setupGridOutlineModel();
+		m.unlock();
 	}
-	else {
-		fullGridSize = newGridSize * newGridSize * newGridSize;
-	}
-
-	grid = new unsigned char[fullGridSize];
-	swapGrid = new unsigned char[fullGridSize];
-
-	modelMatrices = new glm::mat4[fullGridSize];
-	modelMatrices = calculateOffsets(gridSize, is2d);
-
-	//copys data from the temp grid to the new grid
-	memcpy(swapGrid, grid, fullGridSize);
-
-	setupGridOutlineModel();
 }
