@@ -1,25 +1,3 @@
-/*
-Todo:
-	-Keep Track of Boxes:
-		-initialize one D array of vectors (for faster accessing)
-		-calculate grid size (space between each block)
-		-divide by 2 to get the center for the first block (won't be exact but who cares)
-		-
-		-possible box class?
-
-	-Implement rules:
-		-Number of live cells needed to live/die(over and under population)/reproduce.
-			-make this customizable
-		-try to make it run faster that a tortise
-		-Add some sort of delay between updates so that boxes are on the screen for more than a frame
-
-	-Figure out skybox so player doesn't zoom off in to the distance
-
-	-Add box placement mechanisms
-
-	-Add menu window for options (eventually)
-
-*/
 #include "generalLifeLike.h"
 
 //defining the type for the grid. It is a dynamic array of tuples. Each tuple contains the location
@@ -95,6 +73,7 @@ int generalLifeLike::getState(int xin, int yin, int zin) const {
 
 void generalLifeLike::addNewCell(int xin, int yin, int zin, bool playerEdit) {
 	unsigned char* gridToEdit;
+	//The swap grid is the grid that is usually rendered, so this grid is directly edited by the player in order for their edits to be visible
 	if (playerEdit) {
 		gridToEdit = swapGrid;
 	}
@@ -127,7 +106,10 @@ void generalLifeLike::addNewCell(int xin, int yin, int zin, bool playerEdit) {
 				*(gridBoxPtr) += neighbourBitShiftNum * 2;
 			}
 		}
+		//Copy the changes over from the swap grid, which is usually overwritten during the update process, to the regular grid.
+		if (playerEdit) memcpy(grid, swapGrid, fullGridSize);
 	}
+
 }
 
 void generalLifeLike::decayCell(int xin, int yin, int zin, bool playerEdit) {
@@ -163,6 +145,7 @@ void generalLifeLike::decayCell(int xin, int yin, int zin, bool playerEdit) {
 					}
 
 			}
+			if (playerEdit) memcpy(grid, swapGrid, fullGridSize);
 	}
 }
 
@@ -199,6 +182,8 @@ void generalLifeLike::removeCell(int xin, int yin, int zin, bool playerEdit) {
 		}
 		gridBoxPtr = gridToEdit + xin + yin * gridSize + zin * gridSize * gridSize;
 		*(gridBoxPtr) &= ~compareNum;
+
+		if (playerEdit) memcpy(grid, swapGrid, fullGridSize);
 	}
 }
 
@@ -210,8 +195,7 @@ void generalLifeLike::updateGrid() {
 
 	//creating a temporary grid copy so that the current grid is not overwritten while updating
 	m.lock();
-	if (!is2d) memcpy(swapGrid, grid, gridSize * gridSize * gridSize);
-	else memcpy(swapGrid, grid, gridSize * gridSize);
+	memcpy(swapGrid, grid, fullGridSize);
 	
 	m.unlock();
 
@@ -395,11 +379,15 @@ bool generalLifeLike::getIs2d() {
 
 //--------------------------------------------Setters----------------------------------------------------------------------------------------------------------------------------------------------------------
 
-void generalLifeLike::resetAllDecayingCells() {
+void generalLifeLike::resetAllDecayingCells(int oldCompareNum) {
 	unsigned char* gridPtr;
+	//Set the grid pointer to the the swap grid
 	gridPtr = swapGrid;
+	//Set the first grid to be zeroed out
+	grid = new unsigned char[fullGridSize];
+	memset(grid, 0, fullGridSize);
 
-	m.lock();
+	//Here, it iterates over the swap grid to find where a cell currently lives and then spawns the cell in to the completely reset original grid. This prevents issues with removing cells after changing the number of decay states
 	int x, y;
 	for (int z = 0; z < gridSize; z++)
 	{
@@ -408,14 +396,17 @@ void generalLifeLike::resetAllDecayingCells() {
 			x = 0;
 			do {
 
+				//Skip over empty cells with no neighbours
 				while (*gridPtr == 0) {
 					gridPtr++;
 					if (++x >= gridSize) goto rowDone;
 				}
 
-				if ((*gridPtr & compareNum) > 0) {
-					removeCell(x, y, z, false);
-					addNewCell(z, y, z, false);
+				//Using a passed in old comparison number since the new comparison number may not work with the not yet updated grid
+				if ((*gridPtr & oldCompareNum) > 0) {
+					//Add a cell in to the grid, not the swap
+					//removeCell(x, y, z, false);
+					addNewCell(x, y, z, false);
 				}
 				
 				gridPtr++;
@@ -430,9 +421,10 @@ void generalLifeLike::resetAllDecayingCells() {
 
 	}
 
-skip:;
-	//std::cout << sizeof(unsigned int) << " " << sizeof(unsigned char) << " \n";
-	m.unlock();
+	skip:;
+
+	//Since the grid is now correctly filled out with cells with the correct number of decay states, copy the grid over to the swap grid
+	memcpy(swapGrid, grid, fullGridSize);
 }
 
 void generalLifeLike::setBorn(std::vector<int> b) {
@@ -462,6 +454,7 @@ void generalLifeLike::setNeighbours(std::vector<glm::vec3> neighs) {
 void generalLifeLike::setDecayStates(int decayStates) {
 	if (paused) {
 		m.lock();
+		int oldCompare = compareNum;
 		decayStateNum = decayStates;
 		bitShiftNum = 1;
 		neighbourBitShiftNum = 1;
@@ -488,7 +481,7 @@ void generalLifeLike::setDecayStates(int decayStates) {
 				numOfNeighbours--;
 			}
 
-			resetAllDecayingCells();
+			resetAllDecayingCells(oldCompare);
 		}
 
 		m.unlock();
@@ -619,7 +612,7 @@ void generalLifeLike::addToNeighbours(int x, int y, int z) {
 	bool alreadyInList = false;
 
 	//First, it checks if the offset is already in the list. If it is, then it won't add the new block
-	for (int ni = 0; ni < numOfNeighbours; ni++) {
+	for (int ni = 0; ni < numOfNeighbours; ni+=3) {
 		if (neighbourOffsets[ni] == x && neighbourOffsets[ni + 1] == y && neighbourOffsets[ni + 2] == z) {
 			alreadyInList = true;
 			break;
@@ -631,6 +624,7 @@ void generalLifeLike::addToNeighbours(int x, int y, int z) {
 		neighbourOffsets.push_back(y);
 		neighbourOffsets.push_back(z);
 		numOfNeighbours++;
+		resetAllDecayingCells(compareNum);
 	}
 	
 }
@@ -643,6 +637,7 @@ void generalLifeLike::removeFromNeighbours(int x, int y, int z) {
 			neighbourOffsets.erase(neighbourOffsets.begin() + ni);
 			neighbourOffsets.erase(neighbourOffsets.begin() + ni);
 			neighbourOffsets.erase(neighbourOffsets.begin() + ni);
+			resetAllDecayingCells(compareNum);
 			break;
 		}
 	}
@@ -656,6 +651,7 @@ void generalLifeLike::removeAllNeighbours() {
 			neighbourOffsets.pop_back();
 			numOfNeighbours--;
 		}
+		resetAllDecayingCells(compareNum);
 	}
 }
 

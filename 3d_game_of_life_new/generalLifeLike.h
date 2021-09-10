@@ -65,7 +65,7 @@ public:
 	void updateGrid();
 	void render(unsigned int &VAO, Shader &shaderProgram);
 	void renderGridOutline(unsigned int &VAO, Shader &shaderProgram);
-	void resetAllDecayingCells();
+	void resetAllDecayingCells(int oldCompareNum);
 	void setUpGrid(int gridSz);
 	void resizeGrid(int newGridSize);
 	void createMooreNeighbourhood();
